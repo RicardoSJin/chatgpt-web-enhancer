@@ -73,6 +73,59 @@ document.getElementById("simulate-host-replacement").addEventListener("click", (
   event.currentTarget.disabled = true;
 });
 
+document.getElementById("simulate-branch-switch").addEventListener("click", (event) => {
+  const oldAssistant = document.querySelector('[data-turn-id="demo-assistant-3"]');
+  if (!oldAssistant) return;
+
+  const oldFollowup = createOlderTurn(
+    "user",
+    "demo-user-old-branch-tail",
+    "这是旧版本分支中随后提出的问题。",
+  );
+  oldFollowup.dataset.testid = "conversation-turn-6";
+  const oldFollowupAnswer = createOlderTurn(
+    "assistant",
+    "demo-assistant-old-branch-tail",
+    "旧版本分支回答",
+  );
+  oldFollowupAnswer.dataset.testid = "conversation-turn-7";
+  demoScroller.append(oldFollowup, oldFollowupAnswer);
+
+  event.currentTarget.disabled = true;
+  event.currentTarget.textContent = "正在切换消息版本…";
+
+  window.setTimeout(() => {
+    const oldQuestion = document.querySelector('[data-turn-id="demo-user-2"]');
+    if (!oldQuestion) return;
+
+    const newQuestion = createOlderTurn(
+      "user",
+      "demo-user-2-edited",
+      "编辑后重发：时间轴应如何清除旧版本分支？",
+    );
+    newQuestion.dataset.testid = oldQuestion.dataset.testid;
+    const variantButton = document.createElement("button");
+    variantButton.type = "button";
+    variantButton.dataset.testid = "variants-turn-action-button";
+    variantButton.setAttribute("aria-label", "查看版本");
+    variantButton.textContent = "2 / 2";
+    newQuestion.append(variantButton);
+
+    const newAnswer = createOlderTurn(
+      "assistant",
+      "demo-assistant-3-edited",
+      "当前消息版本",
+    );
+    newAnswer.dataset.testid = oldAssistant.dataset.testid;
+
+    oldQuestion.replaceWith(newQuestion);
+    oldAssistant.replaceWith(newAnswer);
+    oldFollowup.remove();
+    oldFollowupAnswer.remove();
+    event.currentTarget.textContent = "已切换到新版本";
+  }, 320);
+});
+
 const demoScroller = document.querySelector("main");
 let olderTurns = null;
 let olderTurnsMounted = false;

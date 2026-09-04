@@ -8,6 +8,7 @@ const {
   getQuestionRecords,
   getRelativeQuestion,
   mergeOrderedIds,
+  reconcileReplacedBranch,
 } = require("../src/timeline-model.js");
 
 test("anchor shift follows stable turn ids when older content is prepended", () => {
@@ -119,5 +120,34 @@ test("newer virtual windows append after their last stable anchor", () => {
   assert.deepEqual(
     mergeOrderedIds(["user-1", "user-3"], ["user-3", "user-5", "user-7"]),
     ["user-1", "user-3", "user-5", "user-7"],
+  );
+});
+
+test("editing a message removes the obsolete branch tail", () => {
+  assert.deepEqual(
+    reconcileReplacedBranch(
+      ["u1", "old-edit", "old-followup-1", "old-followup-2"],
+      ["u1", "new-edit", "new-followup"],
+      ["old-edit"],
+    ),
+    ["u1", "new-edit", "new-followup"],
+  );
+});
+
+test("branch reconciliation keeps cached questions before the edited message", () => {
+  assert.deepEqual(
+    reconcileReplacedBranch(
+      ["cached-u1", "cached-u2", "old-edit", "old-tail"],
+      ["cached-u2", "new-edit"],
+      ["old-edit"],
+    ),
+    ["cached-u1", "cached-u2", "new-edit"],
+  );
+});
+
+test("ordinary virtual mounting does not prune records without a replacement", () => {
+  assert.deepEqual(
+    reconcileReplacedBranch(["u1", "u3"], ["u3", "u5"], []),
+    ["u1", "u3", "u5"],
   );
 });

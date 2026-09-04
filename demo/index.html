@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ChatGPT 网页增强演示</title>
-    <link rel="stylesheet" href="../src/styles.css?v=0800">
-    <link rel="stylesheet" href="../src/timeline.css?v=0800">
+    <link rel="stylesheet" href="../src/styles.css?v=0801">
+    <link rel="stylesheet" href="../src/timeline.css?v=0801">
     <style>
       :root {
         color-scheme: light dark;
@@ -145,6 +145,10 @@
         top: 268px;
       }
 
+      #simulate-branch-switch {
+        top: 320px;
+      }
+
       .demo-dialog-overlay {
         align-items: center;
         background: rgb(0 0 0 / 35%);
@@ -234,6 +238,7 @@
     <button class="demo-debug-button" id="simulate-pro-dialog" type="button">显示获取 Pro 弹窗</button>
     <button class="demo-debug-button" id="simulate-ordinary-dialog" type="button">显示普通弹窗</button>
     <button class="demo-debug-button" id="simulate-host-replacement" type="button">替换主内容容器</button>
+    <button class="demo-debug-button" id="simulate-branch-switch" type="button">模拟编辑消息后重发</button>
     <nav data-testid="conversation-timeline" aria-label="对话时间轴">模拟原时间轴</nav>
     <main data-scroll-root="">
       <section data-testid="conversation-turn-1" data-turn="user" data-turn-id="demo-user-1">
@@ -284,12 +289,12 @@
     </main>
     </div>
 
-    <script src="../src/outline.js?v=0800"></script>
-    <script src="../src/navigation.js?v=0800"></script>
-    <script src="../src/content.js?v=0800"></script>
-    <script src="../src/timeline-model.js?v=0800"></script>
-    <script src="../src/timeline.js?v=0800"></script>
-    <script src="../src/dismiss-promos.js?v=0800"></script>
-    <script src="demo.js?v=0800"></script>
+    <script src="../src/outline.js?v=0801"></script>
+    <script src="../src/navigation.js?v=0801"></script>
+    <script src="../src/content.js?v=0801"></script>
+    <script src="../src/timeline-model.js?v=0801"></script>
+    <script src="../src/timeline.js?v=0801"></script>
+    <script src="../src/dismiss-promos.js?v=0801"></script>
+    <script src="demo.js?v=0801"></script>
   </body>
 </html>

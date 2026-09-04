@@ -16,9 +16,11 @@
   const FLASH_MS = 1500;
   const LOAD_EARLIER_TIMEOUT_MS = 45000;
   const LOCATE_TIMEOUT_MS = 15000;
+  const BRANCH_REPLACEMENT_TTL_MS = 12000;
   const TURN_SELECTOR = '[data-testid^="conversation-turn-"][data-turn]';
   const USER_TURN_SELECTOR = `${TURN_SELECTOR}[data-turn="user"]`;
   const MESSAGE_SELECTOR = '[data-message-author-role="user"]';
+  const VARIANT_BUTTON_SELECTOR = 'button[data-testid="variants-turn-action-button"]';
   const ORIGINAL_TIMELINE_SELECTORS = [
     '[data-testid="conversation-timeline"]',
     '[data-testid="chat-timeline"]',
@@ -44,12 +46,14 @@
     panelInput: null,
     panelList: null,
     panelRenderSignature: "",
+    pendingBranchReplacements: new Map(),
     records: new Map(),
     renderSignature: "",
     root: null,
     scanTimer: 0,
     searchQuery: "",
     tooltip: null,
+    userTurnSlots: new Map(),
   };
 
   function normalizeText(value) {
@@ -84,7 +88,9 @@
     state.navigationErrorId = null;
     state.navigationTargetId = null;
     state.panelRenderSignature = "";
+    state.pendingBranchReplacements.clear();
     state.renderSignature = "";
+    state.userTurnSlots.clear();
     closeTimelinePanel({ resetSearch: true });
     hideTooltip();
   }
@@ -102,6 +108,84 @@
 
   function getStableTurnId(turn) {
     return normalizeText(turn.getAttribute("data-turn-id"));
+  }
+
+  function getTurnSlot(turn) {
+    return normalizeText(turn.getAttribute("data-testid"));
+  }
+
+  function detectReplacedBranches(measurements) {
+    const now = Date.now();
+    const mountedIds = new Set(measurements.map(({ id }) => id));
+    const replacedIds = new Set();
+
+    measurements.forEach(({ id, slot }) => {
+      state.userTurnSlots.forEach((entry, previousSlot) => {
+        if (entry.id === id && previousSlot !== slot) {
+          state.userTurnSlots.delete(previousSlot);
+        }
+      });
+    });
+
+    measurements.forEach(({ id, slot, hasVariants }) => {
+      if (!slot) return;
+
+      const previous = state.userTurnSlots.get(slot);
+      if (previous
+        && previous.id !== id
+        && !mountedIds.has(previous.id)) {
+        state.pendingBranchReplacements.set(slot, {
+          expiresAt: now + BRANCH_REPLACEMENT_TTL_MS,
+          fromId: previous.id,
+          toId: id,
+        });
+      }
+
+      const pending = state.pendingBranchReplacements.get(slot);
+      if (pending
+        && pending.toId === id
+        && hasVariants) {
+        replacedIds.add(pending.fromId);
+        state.pendingBranchReplacements.delete(slot);
+      }
+
+      state.userTurnSlots.set(slot, {
+        id,
+      });
+    });
+
+    state.pendingBranchReplacements.forEach((entry, slot) => {
+      if (now > entry.expiresAt) {
+        state.pendingBranchReplacements.delete(slot);
+      }
+    });
+    return replacedIds;
+  }
+
+  function reconcileReplacedBranches(mountedIds, replacedIds) {
+    if (replacedIds.size === 0) return;
+
+    const nextIds = model.reconcileReplacedBranch(
+      state.orderedIds,
+      mountedIds,
+      replacedIds,
+    );
+    const retainedIds = new Set(nextIds);
+    state.records.forEach((_record, id) => {
+      if (!retainedIds.has(id)) state.records.delete(id);
+    });
+    state.orderedIds = nextIds;
+    if (state.activeId && !retainedIds.has(state.activeId)) state.activeId = null;
+    if (state.navigationErrorId && !retainedIds.has(state.navigationErrorId)) {
+      state.navigationErrorId = null;
+    }
+    if (state.navigationTargetId && !retainedIds.has(state.navigationTargetId)) {
+      state.navigationTargetId = null;
+    }
+    navigation.cancelActive();
+    navigation.resetHistory();
+    state.panelRenderSignature = "";
+    state.renderSignature = "";
   }
 
   function absoluteTopInContainer(element, container) {
@@ -131,8 +215,18 @@
       const absoluteTop = scrollContainer
         ? absoluteTopInContainer(turn, scrollContainer)
         : Number.NaN;
-      measurements.push({ id, turn, previous, absoluteTop });
+      measurements.push({
+        absoluteTop,
+        hasVariants: Boolean(turn.querySelector(VARIANT_BUTTON_SELECTOR)),
+        id,
+        previous,
+        slot: getTurnSlot(turn),
+        turn,
+      });
     });
+
+    const replacedIds = detectReplacedBranches(measurements);
+    reconcileReplacedBranches(mountedIds, replacedIds);
 
     const anchorShift = model.computeAnchorShift(measurements.map(({ previous, absoluteTop }) => ({
       previousTop: previous?.absoluteTop,

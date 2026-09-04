@@ -69,6 +69,22 @@
     return output;
   }
 
+  function reconcileReplacedBranch(existingIds, mountedIds, replacedIds) {
+    const existing = Array.from(new Set(existingIds ?? []));
+    const mounted = Array.from(new Set(mountedIds ?? []));
+    const replaced = new Set(replacedIds ?? []);
+    const cutoff = existing.findIndex((id) => replaced.has(id));
+    if (cutoff < 0) {
+      return mergeOrderedIds(existing, mounted);
+    }
+
+    const mountedSet = new Set(mounted);
+    const preserved = existing.filter((id, index) => {
+      return index < cutoff || mountedSet.has(id);
+    });
+    return mergeOrderedIds(preserved, mounted);
+  }
+
   function getQuestionRecords(records) {
     return Array.from(records ?? [])
       .filter((record) => record.role === "user")
@@ -138,5 +154,6 @@
     getRelativeQuestion,
     mergeOrderedIds,
     normalizeSearchText,
+    reconcileReplacedBranch,
   });
 });

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT 网页增强",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "为 ChatGPT 网页添加回答目录、用户问题时间轴和推广弹窗自动关闭等增强功能。",
   "content_scripts": [
     {
