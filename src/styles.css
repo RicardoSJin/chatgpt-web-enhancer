@@ -2,20 +2,22 @@
   align-items: center;
   box-sizing: border-box;
   display: flex;
-  flex: 0 0 36px;
+  flex: 0 0 auto;
   height: 36px;
   justify-content: center;
   position: relative;
-  width: 36px;
+  width: auto;
 }
 
 .cgpt-answer-toc__button,
+.cgpt-answer-toc__history-button,
 .cgpt-answer-toc__close,
 .cgpt-answer-toc__item {
   font: inherit;
 }
 
-.cgpt-answer-toc__button {
+.cgpt-answer-toc__button,
+.cgpt-answer-toc__history-button {
   align-items: center;
   background: transparent;
   border: 0;
@@ -32,18 +34,21 @@
 }
 
 .cgpt-answer-toc__button:hover:not(:disabled),
+.cgpt-answer-toc__history-button:hover:not(:disabled),
 .cgpt-answer-toc__button[aria-expanded="true"] {
   background: color-mix(in srgb, currentColor 9%, transparent);
 }
 
 .cgpt-answer-toc__button:focus-visible,
+.cgpt-answer-toc__history-button:focus-visible,
 .cgpt-answer-toc__close:focus-visible,
 .cgpt-answer-toc__item:focus-visible {
   outline: 2px solid #10a37f;
   outline-offset: 2px;
 }
 
-.cgpt-answer-toc__button:disabled {
+.cgpt-answer-toc__button:disabled,
+.cgpt-answer-toc__history-button:disabled {
   cursor: default;
   opacity: 0.38;
 }

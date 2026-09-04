@@ -24,6 +24,7 @@
   const CLASS_NAMES = Object.freeze({
     control: "cgpt-answer-toc__control",
     button: "cgpt-answer-toc__button",
+    historyButton: "cgpt-answer-toc__history-button",
     count: "cgpt-answer-toc__count",
     panel: "cgpt-answer-toc__panel",
     panelHeader: "cgpt-answer-toc__panel-header",
@@ -152,6 +153,60 @@
     return icon;
   }
 
+  function createHistoryIcon(direction) {
+    const namespace = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(namespace, "svg");
+    icon.setAttribute("viewBox", "0 0 20 20");
+    icon.setAttribute("width", "20");
+    icon.setAttribute("height", "20");
+    icon.setAttribute("aria-hidden", "true");
+    icon.setAttribute("fill", "none");
+
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("d", direction === "back"
+      ? "M8.25 5.25 3.5 10l4.75 4.75M4 10h7.25a4.75 4.75 0 0 1 4.75 4.75"
+      : "m11.75 5.25 4.75 4.75-4.75 4.75M16 10H8.75A4.75 4.75 0 0 0 4 14.75");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "1.5");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    icon.append(path);
+    return icon;
+  }
+
+  function createHistoryButton(direction) {
+    const button = document.createElement("button");
+    const isBack = direction === "back";
+    const label = isBack ? "返回跳转前的位置" : "前进到下一跳转位置";
+    button.type = "button";
+    button.className = CLASS_NAMES.historyButton;
+    button.dataset.historyDirection = direction;
+    button.disabled = true;
+    button.setAttribute("aria-label", label);
+    button.setAttribute("title", label);
+    button.append(createHistoryIcon(direction));
+    button.addEventListener("click", () => {
+      if (isBack) navigation.goBack();
+      else navigation.goForward();
+    });
+    return button;
+  }
+
+  function updateHistoryButtons(control = globalControl) {
+    if (!(control instanceof HTMLElement)) {
+      return;
+    }
+    const historyState = navigation.getHistoryState();
+    const backButton = control.querySelector('[data-history-direction="back"]');
+    const forwardButton = control.querySelector('[data-history-direction="forward"]');
+    if (backButton instanceof HTMLButtonElement) {
+      backButton.disabled = historyState.busy || !historyState.canGoBack;
+    }
+    if (forwardButton instanceof HTMLButtonElement) {
+      forwardButton.disabled = historyState.busy || !historyState.canGoForward;
+    }
+  }
+
   function createGlobalControl() {
     const control = document.createElement("div");
     control.className = CLASS_NAMES.control;
@@ -176,7 +231,7 @@
         togglePanel(turn, button);
       }
     });
-    control.append(button);
+    control.append(button, createHistoryButton("back"), createHistoryButton("forward"));
     return control;
   }
 
@@ -290,6 +345,8 @@
     } else {
       delete button.dataset.activeTurnKey;
     }
+
+    updateHistoryButtons(control);
 
     return control;
   }
@@ -567,7 +624,7 @@
     activeTurnOverrideKey = target.turnKey;
     ignoreOverrideScrollUntil = Date.now() + 3000;
     closePanel();
-    navigation.enqueue(async (token) => {
+    navigation.enqueueWithHistory(async (token) => {
       await navigation.wait(0, token);
       const result = await navigation.alignToResolver(
         () => resolveHeading(target),
@@ -667,6 +724,7 @@
   window.addEventListener("touchstart", clearActiveTurnOverrideFromInput, { passive: true, capture: true });
   window.addEventListener("pointerdown", clearActiveTurnOverrideFromInput, { passive: true, capture: true });
   window.addEventListener("keydown", clearActiveTurnOverrideFromInput, { capture: true });
+  window.addEventListener(navigation.HISTORY_CHANGE_EVENT, () => updateHistoryButtons());
 
   scanAnswers();
 })();

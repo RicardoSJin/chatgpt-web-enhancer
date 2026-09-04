@@ -705,7 +705,7 @@
 
   function jumpToRecord(turnId) {
     hideTooltip();
-    navigation.enqueue(async (token) => {
+    navigation.enqueueWithHistory(async (token) => {
       state.navigationTargetId = turnId;
       state.navigationErrorId = null;
       state.activeId = turnId;
