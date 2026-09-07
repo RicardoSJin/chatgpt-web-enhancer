@@ -32,11 +32,19 @@
       return [];
     }
 
-    const minimumLevel = Math.min(...normalized.map((heading) => heading.level));
-    return normalized.map((heading) => ({
-      ...heading,
-      depth: heading.level - minimumLevel,
-    }));
+    const hierarchy = [];
+    return normalized.map((heading) => {
+      while (hierarchy.length > 0 && hierarchy.at(-1) >= heading.level) {
+        hierarchy.pop();
+      }
+      hierarchy.push(heading.level);
+      const depth = hierarchy.length - 1;
+      return {
+        ...heading,
+        depth,
+        displayLevel: depth + 1,
+      };
+    });
   }
 
   return Object.freeze({

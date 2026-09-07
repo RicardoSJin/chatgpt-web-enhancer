@@ -895,6 +895,17 @@
     });
   }
 
+  function handleCapturedScroll(event) {
+    const answerTocPanel = document.getElementById("cgpt-answer-toc-panel");
+    const target = event.target instanceof Node ? event.target : null;
+    if (target && (answerTocPanel?.contains(target)
+      || state.panel?.contains(target)
+      || state.root?.contains(target))) {
+      return;
+    }
+    scheduleActiveUpdate();
+  }
+
   function updateActiveFromViewport() {
     if (state.navigationTargetId || state.loadingEarlier) {
       updateActiveNode();
@@ -1056,7 +1067,7 @@
     state.observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     document.addEventListener("keydown", handleGlobalKeydown, true);
     document.addEventListener("pointerdown", handleDocumentPointerDown, true);
-    window.addEventListener("scroll", scheduleActiveUpdate, { passive: true, capture: true });
+    window.addEventListener("scroll", handleCapturedScroll, { passive: true, capture: true });
     window.addEventListener("wheel", releaseNavigationFocusFromInput, { passive: true, capture: true });
     window.addEventListener("touchstart", releaseNavigationFocusFromInput, { passive: true, capture: true });
     window.addEventListener("pointerdown", releaseNavigationFocusFromInput, { passive: true, capture: true });

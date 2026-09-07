@@ -12,6 +12,21 @@ document.getElementById("simulate-stream").addEventListener("click", (event) => 
   event.currentTarget.textContent = "已新增标题";
 });
 
+document.getElementById("simulate-long-outline").addEventListener("click", (event) => {
+  const answer = document.querySelector('[data-testid="conversation-turn-2"] [data-message-author-role="assistant"]');
+  if (!answer) return;
+
+  const fragment = document.createDocumentFragment();
+  for (let index = 1; index <= 16; index += 1) {
+    const heading = document.createElement(index % 4 === 0 ? "h4" : "h3");
+    heading.textContent = `长目录滚动测试 ${index}`;
+    fragment.append(heading);
+  }
+  answer.append(fragment);
+  event.currentTarget.disabled = true;
+  event.currentTarget.textContent = "已生成长目录";
+});
+
 document.getElementById("simulate-unmount-current-question").addEventListener("click", (event) => {
   document.querySelector('[data-turn="user"][data-turn-id="demo-user-1"]')?.remove();
   event.currentTarget.disabled = true;

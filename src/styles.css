@@ -132,7 +132,11 @@
   gap: 2px;
   max-height: calc(min(70vh, 560px) - 52px);
   overflow: auto;
+  overscroll-behavior-y: contain;
   padding: 0.45rem;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  touch-action: pan-y;
 }
 
 .cgpt-answer-toc__item {

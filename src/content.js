@@ -417,12 +417,12 @@
         item.className = CLASS_NAMES.item;
         item.style.setProperty("--cgpt-toc-depth", String(Math.min(entry.depth, 5)));
         item.dataset.headingIndex = String(index);
-        item.title = `跳转到 H${entry.level}：${entry.text}`;
+        item.title = `跳转到目录 H${entry.displayLevel}：${entry.text}`;
 
         const level = document.createElement("span");
         level.className = CLASS_NAMES.itemLevel;
         level.setAttribute("aria-hidden", "true");
-        level.textContent = `H${entry.level}`;
+        level.textContent = `H${entry.displayLevel}`;
 
         const text = document.createElement("span");
         text.className = CLASS_NAMES.itemText;
@@ -510,6 +510,14 @@
     });
   }
 
+  function handleCapturedScroll(event) {
+    const target = event.target instanceof Node ? event.target : null;
+    if (target && openState?.panel.contains(target)) {
+      return;
+    }
+    schedulePanelPosition();
+  }
+
   function handleOutsidePointer(event) {
     if (!openState) {
       return;
@@ -557,7 +565,7 @@
     document.addEventListener("pointerdown", handleOutsidePointer, true);
     document.addEventListener("keydown", handleKeydown, true);
     window.addEventListener("resize", schedulePanelPosition, { passive: true });
-    window.addEventListener("scroll", schedulePanelPosition, { passive: true, capture: true });
+    window.addEventListener("scroll", handleCapturedScroll, { passive: true, capture: true });
 
     panel.querySelector(`.${CLASS_NAMES.item}`)?.focus({ preventScroll: true });
   }
@@ -575,7 +583,7 @@
     document.removeEventListener("pointerdown", handleOutsidePointer, true);
     document.removeEventListener("keydown", handleKeydown, true);
     window.removeEventListener("resize", schedulePanelPosition);
-    window.removeEventListener("scroll", schedulePanelPosition, true);
+    window.removeEventListener("scroll", handleCapturedScroll, true);
 
     if (animationFrame) {
       window.cancelAnimationFrame(animationFrame);
@@ -683,7 +691,11 @@
     });
   }
 
-  function handleViewportScroll() {
+  function handleViewportScroll(event) {
+    const target = event.target instanceof Node ? event.target : null;
+    if (target && document.getElementById(PANEL_ID)?.contains(target)) {
+      return;
+    }
     if (activeTurnOverrideKey && Date.now() > ignoreOverrideScrollUntil) {
       activeTurnOverrideKey = null;
     }
@@ -692,6 +704,11 @@
 
   function clearActiveTurnOverrideFromInput(event) {
     if (!activeTurnOverrideKey) {
+      return;
+    }
+
+    if (event.target instanceof Node
+      && document.getElementById(PANEL_ID)?.contains(event.target)) {
       return;
     }
 
