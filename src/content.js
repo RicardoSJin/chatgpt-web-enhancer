@@ -32,6 +32,9 @@
     close: "cgpt-answer-toc__close",
     list: "cgpt-answer-toc__list",
     empty: "cgpt-answer-toc__empty",
+    row: "cgpt-answer-toc__row",
+    disclosure: "cgpt-answer-toc__disclosure",
+    disclosurePlaceholder: "cgpt-answer-toc__disclosure-placeholder",
     item: "cgpt-answer-toc__item",
     itemLevel: "cgpt-answer-toc__item-level",
     itemText: "cgpt-answer-toc__item-text",
@@ -394,7 +397,20 @@
       return;
     }
 
-    const signature = headingSignature(entries);
+    const currentKeys = new Set(entries.map((entry) => entry.key));
+    openState.collapsedKeys.forEach((key) => {
+      if (!currentKeys.has(key)) openState.collapsedKeys.delete(key);
+    });
+    const collapsedIndexes = new Set();
+    entries.forEach((entry, index) => {
+      if (entry.hasChildren && openState.collapsedKeys.has(entry.key)) {
+        collapsedIndexes.add(index);
+      }
+    });
+    const visibleIndexes = new Set(
+      outlineApi.getVisibleOutlineIndexes(entries, collapsedIndexes),
+    );
+    const signature = `${headingSignature(entries)}\u001e${Array.from(collapsedIndexes).join(",")}`;
     if (openState.signature === signature) {
       openState.entries = entries;
       return;
@@ -412,10 +428,62 @@
       fragment.append(empty);
     } else {
       entries.forEach((entry, index) => {
+        if (!visibleIndexes.has(index)) return;
+
+        const row = document.createElement("div");
+        row.className = CLASS_NAMES.row;
+        row.dataset.headingIndex = String(index);
+        row.style.setProperty("--cgpt-toc-depth", String(Math.min(entry.depth, 5)));
+
+        let disclosure;
+        if (entry.hasChildren) {
+          const expanded = !collapsedIndexes.has(index);
+          disclosure = document.createElement("button");
+          disclosure.type = "button";
+          disclosure.className = CLASS_NAMES.disclosure;
+          disclosure.dataset.headingIndex = String(index);
+          disclosure.setAttribute("aria-expanded", String(expanded));
+          disclosure.setAttribute(
+            "aria-label",
+            `${expanded ? "折叠" : "展开"}“${entry.text}”的下级目录`,
+          );
+          disclosure.title = expanded ? "折叠下级目录" : "展开下级目录";
+
+          const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          icon.setAttribute("viewBox", "0 0 16 16");
+          icon.setAttribute("width", "14");
+          icon.setAttribute("height", "14");
+          icon.setAttribute("aria-hidden", "true");
+          icon.setAttribute("fill", "none");
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", "M6 3.5 10.5 8 6 12.5");
+          path.setAttribute("stroke", "currentColor");
+          path.setAttribute("stroke-width", "1.5");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("stroke-linejoin", "round");
+          icon.append(path);
+          disclosure.append(icon);
+          disclosure.addEventListener("click", () => {
+            if (openState.collapsedKeys.has(entry.key)) {
+              openState.collapsedKeys.delete(entry.key);
+            } else {
+              openState.collapsedKeys.add(entry.key);
+            }
+            openState.signature = "";
+            renderPanel(openState.entries);
+            openState.panel.querySelector(
+              `.${CLASS_NAMES.disclosure}[data-heading-index="${index}"]`,
+            )?.focus({ preventScroll: true });
+          });
+        } else {
+          disclosure = document.createElement("span");
+          disclosure.className = CLASS_NAMES.disclosurePlaceholder;
+          disclosure.setAttribute("aria-hidden", "true");
+        }
+
         const item = document.createElement("button");
         item.type = "button";
         item.className = CLASS_NAMES.item;
-        item.style.setProperty("--cgpt-toc-depth", String(Math.min(entry.depth, 5)));
         item.dataset.headingIndex = String(index);
         item.title = `跳转到目录 H${entry.displayLevel}：${entry.text}`;
 
@@ -436,7 +504,8 @@
           text: entry.text,
         };
         item.addEventListener("click", () => jumpToHeading(target));
-        fragment.append(item);
+        row.append(disclosure, item);
+        fragment.append(row);
       });
     }
 
@@ -482,8 +551,24 @@
       }
     });
 
-    openState.panel.querySelectorAll(`.${CLASS_NAMES.item}`).forEach((item, index) => {
-      if (index === activeIndex) {
+    const renderedIndexes = new Set(
+      Array.from(openState.panel.querySelectorAll(`.${CLASS_NAMES.item}`))
+        .map((item) => Number.parseInt(item.dataset.headingIndex, 10)),
+    );
+    if (!renderedIndexes.has(activeIndex)) {
+      const activeDepth = openState.entries[activeIndex]?.depth ?? 0;
+      for (let index = activeIndex - 1; index >= 0; index -= 1) {
+        if (renderedIndexes.has(index)
+          && openState.entries[index].depth < activeDepth) {
+          activeIndex = index;
+          break;
+        }
+      }
+    }
+
+    openState.panel.querySelectorAll(`.${CLASS_NAMES.item}`).forEach((item) => {
+      const itemIndex = Number.parseInt(item.dataset.headingIndex, 10);
+      if (itemIndex === activeIndex) {
         item.dataset.active = "true";
         item.setAttribute("aria-current", "location");
       } else {
@@ -552,6 +637,7 @@
       turn,
       turnKey: getTurnKey(turn),
       button,
+      collapsedKeys: new Set(),
       entries: [],
       panel,
       signature: "",

@@ -2,7 +2,11 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { buildOutlineEntries, normalizeWhitespace } = require("../src/outline.js");
+const {
+  buildOutlineEntries,
+  getVisibleOutlineIndexes,
+  normalizeWhitespace,
+} = require("../src/outline.js");
 
 test("normalizeWhitespace collapses whitespace", () => {
   assert.equal(normalizeWhitespace("  第一章\n  概览  "), "第一章 概览");
@@ -62,4 +66,52 @@ test("buildOutlineEntries drops empty headings and normalizes invalid levels", (
   assert.equal(entries[0].displayLevel, 1);
   assert.equal(entries[0].depth, 0);
   assert.equal(entries[0].text, "附录");
+});
+
+test("outline entries mark only headings followed by a deeper heading as parents", () => {
+  const entries = buildOutlineEntries([
+    { level: 1, text: "第一章" },
+    { level: 3, text: "第一节" },
+    { level: 4, text: "细节" },
+    { level: 2, text: "第二节" },
+    { level: 1, text: "第二章" },
+  ]);
+
+  assert.deepEqual(
+    entries.map(({ hasChildren }) => hasChildren),
+    [true, true, false, false, false],
+  );
+});
+
+test("duplicate headings receive distinct stable collapse keys", () => {
+  const firstRender = buildOutlineEntries([
+    { level: 1, text: "章节" },
+    { level: 2, text: "重复标题" },
+    { level: 2, text: "重复标题" },
+  ]);
+  const secondRender = buildOutlineEntries([
+    { level: 1, text: "章节" },
+    { level: 2, text: "重复标题" },
+    { level: 2, text: "重复标题" },
+  ]);
+
+  assert.notEqual(firstRender[1].key, firstRender[2].key);
+  assert.deepEqual(
+    firstRender.map(({ key }) => key),
+    secondRender.map(({ key }) => key),
+  );
+});
+
+test("collapsing a heading hides all descendants until the next sibling or ancestor", () => {
+  const entries = buildOutlineEntries([
+    { level: 1, text: "第一章" },
+    { level: 2, text: "第一节" },
+    { level: 3, text: "细节" },
+    { level: 2, text: "第二节" },
+    { level: 1, text: "第二章" },
+  ]);
+
+  assert.deepEqual(getVisibleOutlineIndexes(entries, [0]), [0, 4]);
+  assert.deepEqual(getVisibleOutlineIndexes(entries, [1]), [0, 1, 3, 4]);
+  assert.deepEqual(getVisibleOutlineIndexes(entries, [2]), [0, 1, 2, 3, 4]);
 });
