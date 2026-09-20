@@ -2,14 +2,34 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  buildQuestionText,
   computeAnchorShift,
   filterQuestionRecords,
   getActiveQuestionAtPosition,
   getQuestionRecords,
   getRelativeQuestion,
+  isConversationDomReady,
   mergeOrderedIds,
   reconcileReplacedBranch,
 } = require("../src/timeline-model.js");
+
+test("conversation indexing waits while any outgoing turn is still mounted", () => {
+  assert.equal(isConversationDomReady(["old-u1", "old-a1"], ["old-u1", "old-a1"]), false);
+  assert.equal(isConversationDomReady(["old-a1", "new-u1"], ["old-u1", "old-a1"]), false);
+});
+
+test("conversation indexing resumes only for fresh or empty conversation DOM", () => {
+  assert.equal(isConversationDomReady(["new-u1", "new-a1"], ["old-u1", "old-a1"]), true);
+  assert.equal(isConversationDomReady([], ["old-u1", "old-a1"]), true);
+});
+
+test("question text omits uploaded files and quoted references", () => {
+  assert.equal(buildQuestionText([
+    { text: "Documents/DNN NeuroSim V1.4 Manual.pdf", excluded: true },
+    { text: "仓库 neurosim/NeuroSim: Central repository", excluded: true },
+    { text: "没看到连接，应该怎样部署？", excluded: false },
+  ]), "没看到连接，应该怎样部署？");
+});
 
 test("anchor shift follows stable turn ids when older content is prepended", () => {
   assert.equal(computeAnchorShift([

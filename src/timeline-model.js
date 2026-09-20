@@ -39,6 +39,29 @@
       : (shifts[middle - 1] + shifts[middle]) / 2;
   }
 
+  function isConversationDomReady(currentTurnIds, previousTurnIds) {
+    const current = Array.from(new Set(currentTurnIds ?? []))
+      .map((id) => String(id ?? "").trim())
+      .filter(Boolean);
+    if (current.length === 0) return true;
+
+    const previous = new Set(
+      Array.from(previousTurnIds ?? [])
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean),
+    );
+    return current.every((id) => !previous.has(id));
+  }
+
+  function buildQuestionText(parts) {
+    return Array.from(parts ?? [])
+      .filter((part) => typeof part === "string" || !part?.excluded)
+      .map((part) => typeof part === "string" ? part : part?.text)
+      .map((text) => String(text ?? "").replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join(" ");
+  }
+
   function mergeOrderedIds(existingIds, mountedIds) {
     const output = Array.from(new Set(existingIds ?? []));
     const mounted = Array.from(new Set(mountedIds ?? []));
@@ -146,12 +169,14 @@
   }
 
   return Object.freeze({
+    buildQuestionText,
     compareRecords,
     computeAnchorShift,
     filterQuestionRecords,
     getActiveQuestionAtPosition,
     getQuestionRecords,
     getRelativeQuestion,
+    isConversationDomReady,
     mergeOrderedIds,
     normalizeSearchText,
     reconcileReplacedBranch,

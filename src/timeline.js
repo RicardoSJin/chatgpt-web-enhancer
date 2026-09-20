@@ -20,6 +20,45 @@
   const TURN_SELECTOR = '[data-testid^="conversation-turn-"][data-turn]';
   const USER_TURN_SELECTOR = `${TURN_SELECTOR}[data-turn="user"]`;
   const MESSAGE_SELECTOR = '[data-message-author-role="user"]';
+  const QUESTION_TEXT_SELECTORS = [
+    '[data-testid="user-message-text"]',
+    "[data-message-text]",
+    ".whitespace-pre-wrap",
+    "[data-message-content]",
+  ];
+  const QUESTION_EXCLUDED_SELECTOR = [
+    "[data-chatgpt-answer-toc]",
+    "[data-chatgpt-timeline]",
+    '[data-testid*="attachment" i]',
+    '[data-testid="file-thumbnail"]',
+    '[data-testid^="file-thumbnail-"]',
+    '[data-testid*="uploaded-file" i]',
+    '[data-testid*="quote" i]',
+    '[data-testid*="reference" i]',
+    '[data-testid*="citation" i]',
+    '[data-testid*="source-card" i]',
+    '[data-content-type="attachment" i]',
+    '[data-content-type="file" i]',
+    '[data-content-type="quote" i]',
+    '[data-content-type="reference" i]',
+    '[data-content-type="citation" i]',
+    "[data-attachment-id]",
+    "[data-file-id]",
+    "[data-quote]",
+    "[data-reference]",
+    "[data-citation]",
+    '[aria-label*="附件" i]',
+    '[aria-label*="上传文件" i]',
+    '[aria-label*="引用" i]',
+    '[aria-label*="attachment" i]',
+    '[aria-label*="uploaded file" i]',
+    '[aria-label*="quote" i]',
+    '[aria-label*="reference" i]',
+    "blockquote",
+    "figure",
+    "script",
+    "style",
+  ].join(", ");
   const VARIANT_BUTTON_SELECTOR = 'button[data-testid="variants-turn-action-button"]';
   const ORIGINAL_TIMELINE_SELECTORS = [
     '[data-testid="conversation-timeline"]',
@@ -30,9 +69,11 @@
 
   const state = {
     activeId: null,
+    awaitingConversationDom: false,
     conversationKey: "",
     fullyIndexed: false,
     host: null,
+    knownConversationTurnIds: new Set(),
     lastG: 0,
     lastShiftG: 0,
     list: null,
@@ -47,6 +88,7 @@
     panelList: null,
     panelRenderSignature: "",
     pendingBranchReplacements: new Map(),
+    previousConversationTurnIds: new Set(),
     records: new Map(),
     renderSignature: "",
     root: null,
@@ -66,11 +108,36 @@
     return document.querySelector(TURN_SELECTOR) ? `page:${window.location.pathname}` : "";
   }
 
+  function isRenderedHost(host) {
+    if (!(host instanceof HTMLElement)) return false;
+    if (host.hidden || host.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+    const style = window.getComputedStyle(host);
+    return style.display !== "none"
+      && style.visibility !== "hidden"
+      && host.getClientRects().length > 0;
+  }
+
+  function getMountedTurnIds(scope) {
+    if (!(scope instanceof Element || scope instanceof Document)) return [];
+    return Array.from(scope.querySelectorAll(`${TURN_SELECTOR}[data-turn-id]`))
+      .map(getStableTurnId)
+      .filter(Boolean);
+  }
+
   function findTimelineHost() {
     const hosts = Array.from(document.querySelectorAll(TIMELINE_HOST_SELECTOR));
-    return hosts.find((host) => host.querySelector(TURN_SELECTOR))
-      ?? hosts.find((host) => host.querySelector("[data-scroll-root]"))
-      ?? hosts[0]
+    const renderedHosts = hosts.filter(isRenderedHost);
+    const hostsWithTurns = renderedHosts.filter((host) => host.querySelector(TURN_SELECTOR));
+    if (state.awaitingConversationDom) {
+      const freshHost = hostsWithTurns.find((host) => model.isConversationDomReady(
+        getMountedTurnIds(host),
+        state.previousConversationTurnIds,
+      ) && getMountedTurnIds(host).length > 0);
+      if (freshHost) return freshHost;
+    }
+    return hostsWithTurns[0]
+      ?? renderedHosts.find((host) => host.querySelector("[data-scroll-root]"))
+      ?? renderedHosts[0]
       ?? null;
   }
 
@@ -78,8 +145,18 @@
     const nextKey = currentConversationKey();
     if (nextKey === state.conversationKey) return;
 
+    const previousTurnIds = state.conversationKey
+      ? new Set([
+        ...state.knownConversationTurnIds,
+        ...state.previousConversationTurnIds,
+      ])
+      : new Set();
     navigation.cancelActive();
+    navigation.resetHistory();
     state.conversationKey = nextKey;
+    state.previousConversationTurnIds = previousTurnIds;
+    state.knownConversationTurnIds.clear();
+    state.awaitingConversationDom = previousTurnIds.size > 0;
     state.records.clear();
     state.orderedIds = [];
     state.activeId = null;
@@ -95,15 +172,44 @@
     hideTooltip();
   }
 
+  function hasCurrentConversationDom() {
+    const currentTurnIds = getMountedTurnIds(state.host);
+    if (state.awaitingConversationDom && !model.isConversationDomReady(
+      currentTurnIds,
+      state.previousConversationTurnIds,
+    )) {
+      return false;
+    }
+
+    state.awaitingConversationDom = false;
+    state.previousConversationTurnIds.clear();
+    currentTurnIds.forEach((id) => state.knownConversationTurnIds.add(id));
+    return true;
+  }
+
+  function textWithoutQuestionSupplements(element) {
+    const clone = element.cloneNode(true);
+    if (clone instanceof Element && clone.matches(QUESTION_EXCLUDED_SELECTOR)) return "";
+    clone.querySelectorAll(QUESTION_EXCLUDED_SELECTOR).forEach((supplement) => supplement.remove());
+    return normalizeText(clone.innerText || clone.textContent);
+  }
+
   function extractQuestionText(turn) {
     const message = turn.querySelector(MESSAGE_SELECTOR);
     if (!message) return "";
 
-    const clone = message.cloneNode(true);
-    clone.querySelectorAll(
-      "[data-chatgpt-answer-toc], [data-chatgpt-timeline], script, style",
-    ).forEach((element) => element.remove());
-    return normalizeText(clone.innerText || clone.textContent).slice(0, 4000);
+    let candidates = [];
+    for (const selector of QUESTION_TEXT_SELECTORS) {
+      candidates = Array.from(message.querySelectorAll(selector))
+        .filter((candidate) => !candidate.closest(QUESTION_EXCLUDED_SELECTOR));
+      if (candidates.length > 0) break;
+    }
+
+    const parts = (candidates.length > 0 ? candidates : [message]).map((element) => ({
+      excluded: Boolean(element.closest(QUESTION_EXCLUDED_SELECTOR)),
+      text: textWithoutQuestionSupplements(element),
+    }));
+    return model.buildQuestionText(parts).slice(0, 4000);
   }
 
   function getStableTurnId(turn) {
@@ -205,7 +311,8 @@
     const measurements = [];
     const scrollContainer = findScrollContainer();
 
-    document.querySelectorAll(USER_TURN_SELECTOR).forEach((turn) => {
+    const scope = state.host?.isConnected ? state.host : document;
+    scope.querySelectorAll(USER_TURN_SELECTOR).forEach((turn) => {
       const id = getStableTurnId(turn);
       if (!id || connectedIds.has(id)) return;
 
@@ -714,14 +821,16 @@
 
   function findTurnElement(turnId) {
     const selector = `${USER_TURN_SELECTOR}[data-turn-id="${navigation.cssEscape(turnId)}"]`;
-    const mounted = document.querySelector(selector);
+    const scope = state.host?.isConnected ? state.host : document;
+    const mounted = scope.querySelector(selector);
     const record = state.records.get(turnId);
     if (record) record.element = mounted instanceof HTMLElement ? mounted : null;
     return mounted instanceof HTMLElement ? mounted : null;
   }
 
   function findScrollContainer() {
-    const turn = document.querySelector(TURN_SELECTOR);
+    const scope = state.host?.isConnected ? state.host : document;
+    const turn = scope.querySelector(TURN_SELECTOR);
     return turn
       ? navigation.getScrollContainerForElement(turn)
       : (document.scrollingElement || document.documentElement);
@@ -854,7 +963,7 @@
         const signature = state.orderedIds.join("\u001f");
         const refreshedContainer = findScrollContainer();
         const atTop = !refreshedContainer || refreshedContainer.scrollTop <= 2;
-        const firstUserTurnMounted = Boolean(document.querySelector(
+        const firstUserTurnMounted = Boolean((state.host ?? document).querySelector(
           '[data-testid="conversation-turn-1"][data-turn="user"][data-turn-id]',
         ));
         if (signature === previousSignature && atTop) stablePasses += 1;
@@ -1052,6 +1161,12 @@
     syncConversation();
     ensureRoot();
     suppressOriginalTimeline();
+    if (!hasCurrentConversationDom()) {
+      if (state.root) state.root.hidden = true;
+      closeTimelinePanel({ resetSearch: true });
+      hideTooltip();
+      return;
+    }
     discoverQuestions();
     renderTimeline();
     scheduleActiveUpdate();

@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ChatGPT 网页增强演示</title>
-    <link rel="stylesheet" href="../src/styles.css?v=0803">
-    <link rel="stylesheet" href="../src/timeline.css?v=0803">
+    <link rel="stylesheet" href="../src/styles.css?v=0804">
+    <link rel="stylesheet" href="../src/timeline.css?v=0804">
     <style>
       :root {
         color-scheme: light dark;
@@ -282,7 +282,15 @@
       </section>
 
       <section data-testid="conversation-turn-4" data-turn="user" data-turn-id="demo-user-2">
-        <div data-message-author-role="user">时间轴在长对话中应该如何保持稳定？</div>
+        <div data-message-author-role="user">
+          <figure data-testid="file-thumbnail" aria-label="上传文件：timeline-notes.pdf">
+            <span>Documents/timeline-notes.pdf</span>
+          </figure>
+          <blockquote data-testid="quoted-reference">
+            引用：旧时间轴会在路由切换时保留节点。
+          </blockquote>
+          <div class="whitespace-pre-wrap">时间轴在长对话中应该如何保持稳定？</div>
+        </div>
       </section>
 
       <section data-testid="conversation-turn-5" data-turn="assistant" data-turn-id="demo-assistant-3">
@@ -294,12 +302,12 @@
     </main>
     </div>
 
-    <script src="../src/outline.js?v=0803"></script>
-    <script src="../src/navigation.js?v=0803"></script>
-    <script src="../src/content.js?v=0803"></script>
-    <script src="../src/timeline-model.js?v=0803"></script>
-    <script src="../src/timeline.js?v=0803"></script>
-    <script src="../src/dismiss-promos.js?v=0803"></script>
-    <script src="demo.js?v=0803"></script>
+    <script src="../src/outline.js?v=0804"></script>
+    <script src="../src/navigation.js?v=0804"></script>
+    <script src="../src/content.js?v=0804"></script>
+    <script src="../src/timeline-model.js?v=0804"></script>
+    <script src="../src/timeline.js?v=0804"></script>
+    <script src="../src/dismiss-promos.js?v=0804"></script>
+    <script src="demo.js?v=0804"></script>
   </body>
 </html>
